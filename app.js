@@ -1,112 +1,71 @@
-require('dotenv').config();
+// Import dependencies
 const express = require('express');
-const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
-const Joi = require('joi');
+const dotenv = require('dotenv');
+const mongoose = require('mongoose');
+const path = require('path');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+const cors = require('cors');
+const helmet = require('helmet');
 
+// Load environment variables
+dotenv.config();
+
+// Initialize app
 const app = express();
-const saltRounds = 10;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json());
+// Middleware setup
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(cors());
+app.use(helmet());
 
-// MongoDB Connection
+// View engine setup
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Database connection
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("Connected to MongoDB"))
-    .catch(err => console.error("MongoDB connection failed:", err));
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('Database connection error:', err));
 
-// User Schema
-const userSchema = new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true }
+// Session setup
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
+  },
+}));
+
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const protectedRoutes = require('./routes/protectedRoutes');
+
+// Mount routes
+app.use('/api/auth', authRoutes);         // Authentication routes
+app.use('/api/protected', protectedRoutes); // Protected routes requiring auth
+
+// Default route
+app.get('/', (req, res) => {
+  res.send('Welcome to the Authentication Project');
 });
 
-const User = mongoose.model('User', userSchema);
-
-// Validation Schema using Joi
-const signupSchema = Joi.object({
-    email: Joi.string().email().required(),
-    password: Joi.string().min(6).required()
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'An error occurred', error: err.message });
 });
 
-// Signup Route
-app.post('/signup', async (req, res) => {
-    const { error } = signupSchema.validate(req.body);
-    if (error) return res.status(400).send(error.details[0].message);
-
-    const { email, password } = req.body;
-
-    try {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).send("User already signed up.");
-
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-        const newUser = new User({ email, password: hashedPassword });
-
-        await newUser.save();
-        res.status(201).send("User signed up successfully.");
-    } catch (err) {
-        res.status(500).send("Error signing up.");
-    }
-});
-
-// Login Route
-app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-
-    try {
-        const user = await User.findOne({ email });
-        if (!user) return res.status(400).send("User not found.");
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(401).send("Invalid credentials.");
-
-        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-        res.cookie("token", token, { httpOnly: true, secure: true });
-        res.status(200).send("Login successful.");
-    } catch (err) {
-        res.status(500).send("Error during login.");
-    }
-});
-
-// API Route (Protected)
-app.get('/api', (req, res) => {
-    const token = req.cookies.token;
-    if (!token) return res.status(401).send("Access denied. Please login.");
-
-    try {
-        const verified = jwt.verify(token, process.env.JWT_SECRET);
-        res.status(200).send(`Welcome ${verified.email}, you are authorized to access this information.`);
-    } catch (err) {
-        res.status(403).send("Invalid or expired token.");
-    }
-});
-
-// Logout Route
-app.post('/logout', (req, res) => {
-    res.clearCookie("token");
-    res.status(200).send("Logged out successfully.");
-});
-
-// Profile Route (Optional Enhancement)
-app.get('/profile', (req, res) => {
-    const token = req.cookies.token;
-    if (!token) return res.status(401).send("Access denied. Please login.");
-
-    try {
-        const verified = jwt.verify(token, process.env.JWT_SECRET);
-        res.status(200).send(`User Profile: ${JSON.stringify(verified)}`);
-    } catch (err) {
-        res.status(403).send("Invalid or expired token.");
-    }
-});
-
-// Start Server
-const PORT = process.env.PORT || 8080;
+// Start the server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
