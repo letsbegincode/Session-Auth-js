@@ -1,17 +1,17 @@
 const express = require('express');
-const { login, logout, register } = require('../controllers/authController');
-const { requireAuth, requireRole } = require('../middlewares/authMiddleware');
-const loginLimiter = require('../middlewares/rateLimiter');
+const { signup, login, logout } = require('../controllers/authController');
+const { protect, restrictTo } = require('../middlewares/authMiddleware');
+const { getAdminData, getPublicData } = require('../controllers/dataController');
 
 const router = express.Router();
 
-router.post('/register', register);                // Registration API
-router.post('/login', loginLimiter, login);        // Login API
-router.post('/logout', requireAuth, logout);       // Logout API
+// Authentication routes
+router.post('/signup', signup);
+router.post('/login', login);
+router.post('/logout', logout);
 
-// Dummy API that requires admin role
-router.get('/data', requireAuth, requireRole('admin'), (req, res) => {
-  res.send('This is sensitive admin data, accessible only to admins.');
-});
-
+// Data routes
+router.get('/data', protect, restrictTo('admin'), getAdminData);
+router.get('/public', getPublicData); 
 module.exports = router;
+

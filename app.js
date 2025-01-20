@@ -24,6 +24,12 @@ app.use(cookieParser());
 app.use(cors());
 app.use(helmet());
 
+//url 
+app.use((req,res,next)=>{
+  console.log(req.url)
+  next();
+});
+
 // View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -42,17 +48,15 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
+    maxAge: 40000, // 20 sec
   },
 }));
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
-const protectedRoutes = require('./routes/protectedRoutes');
 
 // Mount routes
-app.use('/api/auth', authRoutes);         // Authentication routes
-app.use('/api/protected', protectedRoutes); // Protected routes requiring auth
+app.use('/auth', authRoutes);       
 
 // Default route
 app.get('/', (req, res) => {

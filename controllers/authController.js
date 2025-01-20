@@ -1,67 +1,95 @@
-const bcrypt = require('bcrypt');
 const User = require('../models/User');
 
-// Register a new user
-const register = async (req, res) => {
-  const { username, password, role } = req.body;
-
+// Register a user and create a session
+exports.signup = async (req, res) => {
   try {
-    // Check if user already exists
-    const existingUser = await User.findOne({ username });
+    const { username, email, password, role } = req.body;
+
+    const validRoles = ['user', 'admin'];
+    const assignedRole = role && validRoles.includes(role) ? role : 'user';
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+
     if (existingUser) {
-      return res.status(400).json({ error: 'Username already exists' });
+      return res.status(400).json({
+        message: 'User already exists. Please use a different email or username.',
+      });
     }
 
-    // Create a new user
-    const newUser = new User({ username, password, role: role || 'user' }); // Default role: 'user'
-    await newUser.save();
+    const user = await User.create({ username, email, password, role: assignedRole });
+    req.session.user = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+    };
 
-    res.status(201).json({ message: 'User registered successfully' });
+    res.status(201).json({
+      message: 'User registered successfully and session started',
+      user: { id: user._id, username: user.username, email: user.email, role: user.role },
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Login a user
-const login = async (req, res) => {
-  const { username, password } = req.body;
 
+
+// Login a user with session-based authentication
+exports.login = async (req, res) => {
   try {
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid username or password' });
-    }
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
 
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.isLocked()) return res.status(403).json({ error: 'Account is locked' });
+
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid username or password' });
+      user.loginAttempts += 1;
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = Date.now() + 30000; // Lock time
+      }
+      await user.save();
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Store userId and role in session
-    req.session.userId = user._id;
-    req.session.role = user.role;
+    // Reset failed login attempts
+    user.loginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
 
-    res.status(200).json({ message: 'Login successful' });
+    // Save user details in session
+    req.session.user = {
+      id: user._id,
+      username: user.username,
+      role: user.role,
+    };
+
+    res.status(200).json({
+      message: 'Login successful',
+      user: { id: user._id, username: user.username, role: user.role },
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(400).json({ error: error.message });
   }
 };
+
+
 
 // Logout a user
-const logout = (req, res) => {
-  if (req.session) {
-    // Destroy session
+exports.logout = (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: 'Unauthorized: No active session found' });
+    }
     req.session.destroy((err) => {
       if (err) {
-        return res.status(500).json({ error: 'Failed to log out' });
+        return res.status(500).json({ message: 'Failed to log out. Please try again later.' });
       }
       res.clearCookie('connect.sid'); // Clear the session cookie
       res.status(200).json({ message: 'Logout successful' });
     });
-  } else {
-    res.status(400).json({ error: 'No active session' });
+  } catch (error) {
+    res.status(500).json({ message: 'An error occurred during logout', error: error.message });
   }
 };
-
-module.exports = { register, login, logout };
