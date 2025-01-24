@@ -1,0 +1,29 @@
+
+
+s%3AlqBLbpnA3x92x4-TeUBDftfFoA8F97xp.JBbW5lwX0%2Bt2kAlSeY%2BPm5VBaZJwG6zFgXr97gJuA4s
+
+
+{
+  "_id": "AZt7HCmO2I02Vh3Amfia6QI8WztU1it9",
+  "expires": {
+    "$date": "2025-01-24T19:55:31.922Z"
+  },
+  "session": {
+    "cookie": {
+      "originalMaxAge": 40000,
+      "partitioned": null,
+      "priority": null,
+      "expires": {
+        "$date": "2025-01-24T19:55:31.922Z"
+      },
+      "secure": false,
+      "httpOnly": true,
+      "domain": null,
+      "path": "/",
+      "sameSite": "lax"
+    },
+    "user": {
+      "id": "6793ed5760b2cb400370de2f"
+    }
+  }
+}

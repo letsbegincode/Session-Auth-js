@@ -13,6 +13,8 @@ const helmet = require('helmet');
 // Load environment variables
 dotenv.config();
 
+const COOKIE_TIME = parseInt(process.env.MAX_AGE, 10);
+
 // Initialize app
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,17 +42,25 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('Database connection error:', err));
 
 // Session setup
-app.use(session({
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 40000, // 20 sec
-  },
-}));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      collectionName: 'sessions',
+      ttl:  COOKIE_TIME/1000, 
+      stringify: false,
+    }),
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge:  COOKIE_TIME, 
+      sameSite: 'lax',
+    },
+  })
+);
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
