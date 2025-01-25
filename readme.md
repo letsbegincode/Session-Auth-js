@@ -38,7 +38,7 @@ This project implements a secure session-based authentication system using Node.
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/letsbegincode/Session-Auth-js.git
    cd <repository-folder>
    ```
 
