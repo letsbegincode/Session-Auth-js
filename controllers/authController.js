@@ -3,10 +3,23 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const Session = mongoose.connection.collection('sessions');
 const PROFILE_LOCK_TIME = parseInt(process.env.PROFILE_LOCK_TIME, 10);
+const LOGIN_LIMIT = parseInt(process.env.LOGIN_LIMIT, 10);
+
+const {registerSchema,
+      loginSchema,
+      resetSchema}= require('../utils/validationSchemas');
+
 
 // Register a user and create a session
 exports.signup = async (req, res) => {
   try {
+
+    const { error } = registerSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
+    }
+
+    // Proceed with registration logic
     const { username, email, password, role } = req.body;
 
     // Validate and assign the role
@@ -27,7 +40,7 @@ exports.signup = async (req, res) => {
     // Set session data in req.session
     req.session.user = {
       id: user._id.toString(),
-      role: user.role, 
+      role: user.role,
     };
 
     // Send success response
@@ -44,11 +57,16 @@ exports.signup = async (req, res) => {
 // Login a user with session-based authentication
 exports.login = async (req, res) => {
   try {
+
+    const { error } = loginSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
+    }
     const { username, password } = req.body;
 
     // Find user by username
     const user = await User.findOne({ username });
-    if (!user) {
+    if (!user || !password) {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
@@ -62,7 +80,7 @@ exports.login = async (req, res) => {
     if (!isPasswordValid) {
       user.loginAttempts += 1;
 
-      if (user.loginAttempts >= 5) {
+      if (user.loginAttempts >= LOGIN_LIMIT) {
         user.lockUntil = new Date(Date.now() + PROFILE_LOCK_TIME);
       }
 
@@ -93,7 +111,7 @@ exports.login = async (req, res) => {
     // Set session data for the new session after successful login
     req.session.user = {
       id: user._id.toString(),
-      role: user.role, 
+      role: user.role,
     };
 
     // Attempt to save the session before sending the response
@@ -154,15 +172,10 @@ exports.logout = (req, res) => {
 // Reset password function
 exports.reset = async (req, res) => {
   try {
-    const { username, newPassword, confirmPassword } = req.body;
 
-    // Validate input fields
-    if (!username || !newPassword || !confirmPassword) {
-      return res.status(400).json({ message: 'Username and both password fields are required.' });
-    }
-
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: 'Passwords do not match.' });
+    const { error } = resetSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
     }
 
     // Ensure the user has an active session and valid user data
@@ -186,13 +199,6 @@ exports.reset = async (req, res) => {
       return res.status(403).json({ message: 'Account is locked. Password reset is not allowed at this time.' });
     }
 
-    // Ensure new password meets security criteria
-    // if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
-    //   return res.status(400).json({
-    //     message: 'Password must be at least 8 characters long and include at least one uppercase letter and one number.',
-    //   });
-    // }
-
     // Hash the new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
@@ -204,7 +210,7 @@ exports.reset = async (req, res) => {
 
     req.session.user = {
       id: user._id.toString(),
-      role: user.role, 
+      role: user.role,
     };
 
 

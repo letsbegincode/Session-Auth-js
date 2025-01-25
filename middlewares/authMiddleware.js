@@ -1,3 +1,4 @@
+const { roleSchema } = require('../utils/validationSchemas');
 // Protect routes
 exports.protect = (req, res, next) => {
   if (!req.session || !req.session.user || !req.session.user.id ) {
@@ -8,13 +9,15 @@ exports.protect = (req, res, next) => {
 };
 
 // Role-based authorization
-exports.restrictTo = (role) => (req, res, next) => {
-  if (req.session.user.role !== role) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
 
+exports.restrictTo = (role) => (req, res, next) => {
+  const { error } = roleSchema.validate(role);
+  if (error) {
+    return res.status(400).json({ message: 'Invalid role provided' });
+  }
   next();
 };
+
 
 
 exports.errorHandler = (err, req, res, next) => {
