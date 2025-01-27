@@ -77,7 +77,7 @@ This project implements a secure session-based authentication system using Node.
 ### **Authentication Routes**
 
 #### 1. **Register**
-**POST** `/auth/register`
+**POST** `/auth/signup`
 
 **Request Body:**
 ```json
@@ -114,6 +114,13 @@ This project implements a secure session-based authentication system using Node.
 **Response:**
 - Success: `200 OK`.
 - Failure: Appropriate error message.
+- 
+#### 4. **Renew-session**
+**POST** `/auth/renew`
+
+**Response:**
+- Success: `200 OK`.
+- Failure: Appropriate error message.
 
 ---
 
@@ -140,7 +147,7 @@ This project implements a secure session-based authentication system using Node.
 ### **Role-Based Access**
 
 #### 1. **Restricted Route Example**
-**GET** `/data/admin`
+**GET** `/auth/data`
 
 **Headers:**
 - Must include a valid session cookie.
